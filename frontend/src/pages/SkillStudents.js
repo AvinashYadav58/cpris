@@ -27,6 +27,7 @@ export default function SkillStudents() {
   // =================================================
   // LOAD + FILTER
   // =================================================
+
   useEffect(() => {
 
     axios.get(`${API}/students`)
@@ -58,7 +59,7 @@ export default function SkillStudents() {
         setStudents(filtered);
       });
 
-  }, [location.search]);
+  }, [location.search, skills, minCgpa, coding, aptitude, department]);
 
 
 

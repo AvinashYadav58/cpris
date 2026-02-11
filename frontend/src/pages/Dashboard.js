@@ -73,7 +73,7 @@ export default function Dashboard() {
       setSkillStats(null);
     }
 
-  }, [search, minCgpa, minCoding, minAptitude, department]);
+  }, [skillArray.length, search, minCgpa, minCoding, minAptitude, department]);
 
 
 

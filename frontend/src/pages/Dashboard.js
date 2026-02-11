@@ -48,6 +48,7 @@ export default function Dashboard() {
     .map(s => s.trim())
     .filter(Boolean);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
 
     axios.get(`${API}/dashboard/skill-distribution`, {

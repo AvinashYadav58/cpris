@@ -134,30 +134,46 @@ export default function CompanyManager() {
 
 
         {/* ---------------- LIST ---------------- */}
+        {/* ---------------- LIST ---------------- */}
         <h2>Company List</h2>
 
         {companies.length === 0 && <p>No companies added yet.</p>}
 
-        {companies.map(c => (
-          <div
-            key={c._id}
-            style={{
-              border: "1px solid black",
-              padding: 10,
-              marginBottom: 10
-            }}
-          >
-            <b>{c.name}</b> – {c.role}
-            <br />
-            CGPA: {c.min_cgpa} | Coding: {c.coding_cutoff}
-            <br />
-            Skills: {c.skills.join(", ")}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+          gap: 15
+        }}>
+          {companies.map(c => (
+            <div
+              key={c._id}
+              style={{
+                border: "1px solid #333",
+                padding: 12,
+                borderRadius: 8,
+                background: "#f8fafc"
+              }}
+            >
+              <h3 style={{ marginTop: 0 }}>{c.name || "-"}</h3>
 
-            <br />
-            <button onClick={() => editCompany(c)}>Edit</button>
-            <button onClick={() => deleteCompany(c._id)}>Delete</button>
-          </div>
-        ))}
+              <p><b>Role:</b> {c.role || "-"}</p>
+              <p><b>Min CGPA:</b> {c.min_cgpa ?? "-"}</p>
+              <p><b>Coding Cutoff:</b> {c.coding_cutoff ?? "-"}</p>
+              <p><b>Skills:</b> {c.skills?.length ? c.skills.join(", ") : "-"}</p>
+
+              <div style={{ marginTop: 10 }}>
+                <button onClick={() => editCompany(c)}>Edit</button>
+                <button
+                  onClick={() => deleteCompany(c._id)}
+                  style={{ marginLeft: 5 }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
       </div>
     </div>
   );

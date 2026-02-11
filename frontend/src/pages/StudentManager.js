@@ -143,20 +143,44 @@ export default function StudentManager() {
         {/* -------- LIST -------- */}
         <h2>Students</h2>
 
-        {students.map(s => (
-          <div key={s._id} style={{ border: "1px solid black", margin: 5, padding: 5 }}>
-            <b>{s.name}</b> – {s.department}
-            <br />
-            CGPA: {s.cgpa} | Coding: {s.coding_score}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+          gap: 15
+        }}>
+          {students.map(s => (
+            <div key={s._id} style={{
+              border: "1px solid #333",
+              padding: 12,
+              borderRadius: 8,
+              background: "#f8fafc"
+            }}>
 
-            <br />
-            <button onClick={() => editStudent(s)}>Edit</button>
-            <button onClick={() => del(s._id)}>Delete</button>
-            <a href={`/student/${s._id}`}>
-              <button>View</button>
-            </a>
-          </div>
-        ))}
+              <h3 style={{ marginTop: 0 }}>{s.name || "-"}</h3>
+
+              <p><b>Department:</b> {s.department || "-"}</p>
+              <p><b>CGPA:</b> {s.cgpa ?? "-"}</p>
+              <p><b>Coding:</b> {s.coding_score ?? "-"}</p>
+              <p><b>Aptitude:</b> {s.aptitude_score ?? "-"}</p>
+              <p><b>Communication:</b> {s.communication_score ?? "-"}</p>
+              <p><b>Internships:</b> {s.internships ?? "-"}</p>
+              <p><b>Projects:</b> {s.projects ?? "-"}</p>
+              <p><b>Skills:</b> {s.skills?.length ? s.skills.join(", ") : "-"}</p>
+
+              <div style={{ marginTop: 10 }}>
+                <button onClick={() => editStudent(s)}>Edit</button>
+                <button onClick={() => del(s._id)} style={{ marginLeft: 5 }}>
+                  Delete
+                </button>
+                <a href={`/student/${s._id}`}>
+                  <button style={{ marginLeft: 5 }}>View</button>
+                </a>
+              </div>
+
+            </div>
+          ))}
+        </div>
+
       </div>
     </div>
   );

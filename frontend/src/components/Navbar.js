@@ -13,7 +13,6 @@ export default function Navbar(){
       <Link to="/manage-students" style={{color:"white"}}>Students</Link>
       <Link to="/manage-companies" style={{color:"white"}}>Companies</Link>
       <Link to="/manage-skills" style={{color:"white"}}>Skills</Link>
-      <Link to="/analysis" style={{color:"white"}}>Analysis</Link>
     </div>
   );
 }

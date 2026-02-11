@@ -99,14 +99,21 @@ def student_report(id):
 # ---------------- ADD COMPANY ----------------
 @app.route("/companies", methods=["POST"])
 def add_company():
+
     data = request.json
+
+    # -------- auto register skills --------
+    for skill in data.get("skills", []):
+        exists = db.skills.find_one({"name": skill})
+        if not exists:
+            db.skills.insert_one({"name": skill})
+
     res = companies.insert_one(data)
 
     return jsonify({
         "msg": "company added",
         "id": str(res.inserted_id)
     })
-
 
 # ---------------- GET COMPANIES ----------------
 @app.route("/companies", methods=["GET"])
@@ -121,7 +128,14 @@ def get_companies():
 # ---------------- UPDATE COMPANY ----------------
 @app.route("/companies/<id>", methods=["PUT"])
 def update_company(id):
+
     data = request.json
+
+    # -------- auto register skills --------
+    for skill in data.get("skills", []):
+        exists = db.skills.find_one({"name": skill})
+        if not exists:
+            db.skills.insert_one({"name": skill})
 
     companies.update_one(
         {"_id": ObjectId(id)},
@@ -139,28 +153,42 @@ def delete_company(id):
 
 
 # ---------------- COMPANY ANALYSIS ----------------
-@app.route("/analyze/company/<id>", methods=["GET"])
-def analyze_company(id):
-    c = companies.find_one({"_id": ObjectId(id)})
+@app.route("/analyze/company/<name>")
+def analyze_company(name):
+
+    c = companies.find_one({"name": name})
+
+    if not c:
+        return jsonify({"error": "Company not found"}), 404
 
     total = students.count_documents({})
     ready = 0
     gaps = {}
 
     for s in students.find():
-        if s["cgpa"] >= c["min_cgpa"] and s["coding_score"] >= c["coding_cutoff"]:
-            matched = set(s["skills"]).intersection(set(c["skills"]))
 
-            if len(matched) == len(c["skills"]):
-                ready += 1
-            else:
-                for skill in c["skills"]:
-                    if skill not in matched:
-                        gaps[skill] = gaps.get(skill, 0) + 1
+        ok = True
+
+        if s["cgpa"] < c["min_cgpa"]:
+            ok = False
+
+        if s["coding_score"] < c["coding_cutoff"]:
+            ok = False
+
+        for skill in c["skills"]:
+            if skill not in s["skills"]:
+                gaps[skill] = gaps.get(skill, 0) + 1
+                ok = False
+
+        if ok:
+            ready += 1
+
+    percent = round((ready/total)*100,2) if total else 0
 
     return jsonify({
         "company": c["name"],
-        "ready_percent": round((ready / total) * 100, 2),
+        "eligible": ready,
+        "percent": percent,
         "gaps": gaps
     })
 
@@ -251,41 +279,78 @@ def skill_dashboard(skill):
     })
 
 @app.route("/dashboard/skills")
-def multi_skill_dashboard():
+def skills_dashboard():
 
-    skills = request.args.get("skills")  # "DSA,React"
+    skills_param = request.args.get("skills", "")
+    min_cgpa = request.args.get("min_cgpa")
+    coding = request.args.get("coding")
+    aptitude = request.args.get("aptitude")   # ⭐ NEW
 
-    if not skills:
-        return jsonify({})
+    # convert numbers safely
+    min_cgpa = float(min_cgpa) if min_cgpa else None
+    coding = float(coding) if coding else None
+    aptitude = float(aptitude) if aptitude else None   # ⭐ NEW
 
-    skills = [s.strip() for s in skills.split(",")]
+    # make skills list
+    skills = [s.strip().lower() for s in skills_param.split(",") if s.strip()]
 
-    total_students = students.count_documents({})
+    total = students.count_documents({})
+    matched_students = 0
 
-    # students having ANY skill
-    matched_students = list(students.find({
-        "skills": {"$in": skills}
-    }))
 
-    for s in matched_students:
-        s["_id"] = str(s["_id"])
+    # =================================================
+    # STUDENT FILTERING
+    # =================================================
+    for s in students.find():
 
-    count = len(matched_students)
-    percent = round((count / total_students) * 100, 2) if total_students else 0
+        # CGPA
+        if min_cgpa is not None and s.get("cgpa", 0) < min_cgpa:
+            continue
 
-    # companies requiring ANY skill
-    company_need = companies.count_documents({
-        "skills": {"$in": skills}
-    })
+        # Coding
+        if coding is not None and s.get("coding_score", 0) < coding:
+            continue
+
+        # Aptitude ⭐
+        if aptitude is not None and s.get("aptitude_score", 0) < aptitude:
+            continue
+
+        # Skills
+        if skills:
+            student_skills = [x.lower() for x in s.get("skills", [])]
+
+            if not any(skill in student_skills for skill in skills):
+                continue
+
+        matched_students += 1
+
+
+    percent = round((matched_students / total) * 100, 2) if total else 0
+
+
+    # =================================================
+    # COMPANIES REQUIRING THESE SKILLS
+    # =================================================
+    companies_list = []
+
+    if skills:
+        for c in companies.find():
+
+            company_skills = [x.lower() for x in c.get("skills", [])]
+
+            if any(skill in company_skills for skill in skills):
+                companies_list.append({
+                    "name": c.get("name"),
+                    "role": c.get("role")
+                })
+
 
     return jsonify({
         "skills": skills,
-        "students_count": count,
+        "students_count": matched_students,
         "students_percent": percent,
-        "companies_need": company_need,
-        "students": matched_students
+        "companies_need": companies_list
     })
-
 
 @app.route("/dashboard/skill-distribution")
 def skill_distribution():
@@ -304,6 +369,57 @@ def skill_distribution():
         })
 
     return jsonify(result)
+
+@app.route("/dashboard/company-readiness")
+def company_readiness():
+
+    total_students = students.count_documents({})
+    result = []
+
+    for c in companies.find():
+
+        eligible = 0
+        gaps = {
+            "cgpa": 0,
+            "coding": 0,
+            "skills": {}
+        }
+
+        for s in students.find():
+
+            ok = True
+
+            # cgpa
+            if s["cgpa"] < c["min_cgpa"]:
+                gaps["cgpa"] += 1
+                ok = False
+
+            # coding
+            if s["coding_score"] < c["coding_cutoff"]:
+                gaps["coding"] += 1
+                ok = False
+
+            # skills
+            for skill in c["skills"]:
+                if skill not in s["skills"]:
+                    gaps["skills"][skill] = gaps["skills"].get(skill, 0) + 1
+                    ok = False
+
+            if ok:
+                eligible += 1
+
+
+        percent = round((eligible / total_students) * 100, 2) if total_students else 0
+
+        result.append({
+            "company": c["name"],
+            "eligible": eligible,
+            "percent": percent,
+            "gaps": gaps
+        })
+
+    return jsonify(result)
+
 
 
 if __name__ == "__main__":

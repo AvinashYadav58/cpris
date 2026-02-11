@@ -7,4 +7,4 @@ RUN pip install -r requirements.txt
 
 COPY backend .
 
-CMD ["python", "app.py"]
+CMD ["python", "app.py", "predictor.py"]

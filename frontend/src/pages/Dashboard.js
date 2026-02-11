@@ -16,6 +16,8 @@ export default function Dashboard() {
   const [distribution, setDistribution] = useState([]);
   const [skillsChart, setSkillsChart] = useState([]);
   const [companyReadiness, setCompanyReadiness] = useState([]);
+  const [focus, setFocus] = useState(null);
+
 
   const [search, setSearch] = useState("");
   const [minCgpa, setMinCgpa] = useState("");
@@ -37,6 +39,9 @@ export default function Dashboard() {
 
     axios.get(`${API}/dashboard/company-readiness`)
       .then(r => setCompanyReadiness(r.data));
+
+    axios.get(`${API}/dashboard/focus-analysis`)
+    .then(r => setFocus(r.data));
   }, []);
 
   // =================================================
@@ -257,6 +262,71 @@ export default function Dashboard() {
             <LabelList dataKey="percent" position="top" formatter={(v)=>`${v}%`} />
           </Bar>
         </BarChart>
+
+        {/* ================================================= */}
+        {/* FOCUS RECOMMENDATION ENGINE */}
+        {/* ================================================= */}
+        {focus && (
+          <>
+            <h2>Placement Cell Focus Recommendations</h2>
+
+            {/* OVERALL */}
+            <div style={{
+              border:"1px solid",
+              padding:15,
+              borderRadius:8,
+              marginBottom:20,
+              background:"#eef2ff"
+            }}>
+              <h3>Overall Campus</h3>
+              <p><b>Coding Avg:</b> {focus.overall.coding}</p>
+              <p><b>Aptitude Avg:</b> {focus.overall.aptitude}</p>
+              <p><b>CGPA Avg:</b> {focus.overall.cgpa}</p>
+
+              {focus.overall.coding < 60 && <p>⚠ Increase coding contests</p>}
+              {focus.overall.aptitude < 60 && <p>⚠ Add aptitude training</p>}
+              {focus.overall.cgpa < 7 && <p>⚠ Academic mentoring required</p>}
+            </div>
+
+
+            {/* DEPARTMENT */}
+            <h3>Department Wise Strategy</h3>
+
+            <div style={{
+              display:"grid",
+              gridTemplateColumns:"repeat(auto-fill, minmax(280px,1fr))",
+              gap:15
+            }}>
+              {focus.departments.map((d,i)=>(
+                <div key={i} style={{
+                  border:"1px solid",
+                  padding:12,
+                  borderRadius:8,
+                  background:"#f8fafc"
+                }}>
+                  <h4>{d.name}</h4>
+
+                  <p>Coding: {d.coding}</p>
+                  <p>Aptitude: {d.aptitude}</p>
+                  <p>CGPA: {d.cgpa}</p>
+
+                  {d.coding < 60 && <p>⚠ Improve coding</p>}
+                  {d.aptitude < 60 && <p>⚠ Improve aptitude</p>}
+                  {d.cgpa < 7 && <p>⚠ Academic support</p>}
+
+                  {d.weak_skills.length > 0 && (
+                    <>
+                      <b>Skill Gaps:</b>
+                      <ul>
+                        {d.weak_skills.map((s,j)=><li key={j}>{s}</li>)}
+                      </ul>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
       </div>
     </div>

@@ -4,11 +4,12 @@ from pymongo import MongoClient
 from bson import ObjectId
 from model import load_model
 from readiness import readiness
+from predictor import predict, analyze_gaps
 
 app = Flask(__name__)
 CORS(app)
 
-client = MongoClient("mongodb://localhost:27017/")
+client = MongoClient("mongodb+srv://cpris:mkIDKy0hrI3qmMZZ@cluster0.riht4km.mongodb.net/?appName=Cluster0")
 db = client["cpris"]
 
 students = db.students
@@ -515,6 +516,108 @@ def company_eligible(id):
         "percent": percent,
         "students": eligible
     })
+
+
+@app.route("/dashboard/focus-analysis")
+def focus_analysis():
+
+    result = {}
+
+    # =================================================
+    # OVERALL ANALYSIS
+    # =================================================
+    all_students = list(students.find())
+    total = len(all_students)
+
+    if total == 0:
+        return jsonify({})
+
+    avg_coding = sum(s.get("coding_score", 0) for s in all_students) / total
+    avg_aptitude = sum(s.get("aptitude_score", 0) for s in all_students) / total
+    avg_cgpa = sum(s.get("cgpa", 0) for s in all_students) / total
+
+    result["overall"] = {
+        "coding": round(avg_coding, 1),
+        "aptitude": round(avg_aptitude, 1),
+        "cgpa": round(avg_cgpa, 1)
+    }
+
+
+    # =================================================
+    # DEPARTMENT WISE
+    # =================================================
+    departments = students.distinct("department")
+    dept_result = []
+
+    for dept in departments:
+
+        stu = list(students.find({"department": dept}))
+        t = len(stu)
+        if t == 0:
+            continue
+
+        coding = sum(s.get("coding_score", 0) for s in stu) / t
+        aptitude = sum(s.get("aptitude_score", 0) for s in stu) / t
+        cgpa = sum(s.get("cgpa", 0) for s in stu) / t
+
+        # skill gaps
+        weak_skills = []
+
+        for sk in db.skills.find():
+            name = sk["name"]
+
+            count = students.count_documents({
+                "department": dept,
+                "skills": name
+            })
+
+            percent = (count / t) * 100
+            demand = companies.count_documents({"skills": name})
+
+            if percent < 40 and demand > 0:
+                weak_skills.append(name)
+
+        dept_result.append({
+            "name": dept,
+            "coding": round(coding, 1),
+            "aptitude": round(aptitude, 1),
+            "cgpa": round(cgpa, 1),
+            "weak_skills": weak_skills
+        })
+
+    result["departments"] = dept_result
+
+    return jsonify(result)
+
+
+@app.route("/predict/<student_id>")
+def predict_student(student_id):
+
+    s = students.find_one({"_id": ObjectId(student_id)})
+    if not s:
+        return jsonify({"error": "student not found"}), 404
+
+    all_skills = [x["name"] for x in db.skills.find()]
+
+    output = []
+
+    for c in companies.find():
+
+        prob = predict(c["name"], s, all_skills)
+        if prob is None:
+            continue
+
+        strong, gaps = analyze_gaps(s, c)
+
+        output.append({
+            "company": c["name"],
+            "role": c.get("role"),
+            "probability": prob,
+            "strong": strong,
+            "gaps": gaps
+        })
+
+    return jsonify(output)
 
 
 

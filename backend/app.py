@@ -619,6 +619,10 @@ def predict_student(student_id):
 
     return jsonify(output)
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 
 
 if __name__ == "__main__":

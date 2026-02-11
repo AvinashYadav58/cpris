@@ -20,7 +20,9 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [minCgpa, setMinCgpa] = useState("");
   const [minCoding, setMinCoding] = useState("");
-  const [minAptitude, setMinAptitude] = useState("");   // ⭐ NEW
+  const [minAptitude, setMinAptitude] = useState("");
+
+  const [department, setDepartment] = useState("");  
 
   const [skillStats, setSkillStats] = useState(null);
 
@@ -33,15 +35,9 @@ export default function Dashboard() {
     axios.get(`${API}/dashboard/summary`)
       .then(r => setSkillsChart(r.data.skills));
 
-    axios.get(`${API}/dashboard/skill-distribution`)
-      .then(r => setDistribution(r.data));
-
     axios.get(`${API}/dashboard/company-readiness`)
       .then(r => setCompanyReadiness(r.data));
-
   }, []);
-
-
 
   // =================================================
   // SEARCH INTELLIGENCE
@@ -53,14 +49,19 @@ export default function Dashboard() {
 
   useEffect(() => {
 
-    if (skillArray.length > 0 || minCgpa || minCoding || minAptitude) {
+    axios.get(`${API}/dashboard/skill-distribution`, {
+      params: { department }
+    }).then(r => setDistribution(r.data));
+
+    if (skillArray.length > 0 || minCgpa || minCoding || minAptitude || department) {
 
       axios.get(`${API}/dashboard/skills`, {
         params: {
           skills: search,
           min_cgpa: minCgpa,
           coding: minCoding,
-          aptitude: minAptitude    // ⭐ NEW
+          aptitude: minAptitude,
+          department: department 
         }
       })
         .then(r => setSkillStats(r.data))
@@ -70,7 +71,7 @@ export default function Dashboard() {
       setSkillStats(null);
     }
 
-  }, [search, minCgpa, minCoding, minAptitude]);   // ⭐ NEW
+  }, [search, minCgpa, minCoding, minAptitude, department]);
 
 
 
@@ -86,11 +87,20 @@ export default function Dashboard() {
   // CLICK NAVIGATION
   // =================================================
   const openSkill = (skill) => {
-    navigate(`/skills?skills=${skill}`);
+    navigate(`/skills?skills=${skill}&department=${department}`);
   };
 
-  const openCompany = (company) => {
-    navigate(`/company/${company}`);
+  const openCompany = (companyName) => {
+    const company = companyReadiness.find(
+      c => c.company === companyName
+    );
+
+    if (!company || !company.id) {
+      alert("Company ID missing");
+      return;
+    }
+
+    navigate(`/company/${company.id}`);
   };
 
 
@@ -120,30 +130,43 @@ export default function Dashboard() {
             placeholder="Skills (DSA, React)"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ width: 180, marginRight: 10, marginTop: 5 }}
+            style={{ width: 150, marginRight: 10, marginTop: 5 }}
           />
 
           <input
             placeholder="Min CGPA"
             value={minCgpa}
             onChange={e => setMinCgpa(e.target.value)}
-            style={{ width: 110, marginRight: 10 }}
+            style={{ width: 100, marginRight: 10 }}
           />
 
           <input
             placeholder="Coding >="
             value={minCoding}
             onChange={e => setMinCoding(e.target.value)}
-            style={{ width: 110, marginRight: 10 }}
+            style={{ width: 100, marginRight: 10 }}
           />
 
-          {/* ⭐ NEW */}
           <input
             placeholder="Aptitude >="
             value={minAptitude}
             onChange={e => setMinAptitude(e.target.value)}
-            style={{ width: 110 }}
+            style={{ width: 100, marginRight: 10 }}
           />
+
+          {/* ⭐ NEW DEPARTMENT */}
+          <select
+            value={department}
+            onChange={e => setDepartment(e.target.value)}
+            style={{ width: 130 }}
+          >
+            <option value="">All Dept</option>
+            <option value="CSE">CSE</option>
+            <option value="IT">IT</option>
+            <option value="ECE">ECE</option>
+            <option value="ME">ME</option>
+          </select>
+
         </div>
 
 
@@ -164,40 +187,19 @@ export default function Dashboard() {
             {search && <p><b>Skills:</b> {skillStats.skills.join(", ")}</p>}
             {minCgpa && <p><b>Min CGPA:</b> {minCgpa}</p>}
             {minCoding && <p><b>Coding ≥:</b> {minCoding}</p>}
-            {minAptitude && <p><b>Aptitude ≥:</b> {minAptitude}</p>} {/* ⭐ */}
+            {minAptitude && <p><b>Aptitude ≥:</b> {minAptitude}</p>}
+            {department && <p><b>Department:</b> {department}</p>}
 
             <p><b>Students matched:</b> {skillStats.students_count}</p>
             <p><b>Campus %:</b> {skillStats.students_percent}</p>
 
-            <p><b>Companies requiring:</b></p>
-
-            <ul>
-              {skillStats.companies_need.length === 0 && <li>None</li>}
-
-              {skillStats.companies_need.map((c, i) => (
-                <li key={i} style={{ marginBottom: 5 }}>
-                  {c.name} – {c.role}
-
-                  <button
-                    style={{ marginLeft: 10 }}
-                    onClick={() => navigate(`/company/${c.name}`)}
-                  >
-                    View
-                  </button>
-                </li>
-              ))}
-            </ul>
-
             <p><b>Status:</b> {getStatus()}</p>
 
-
-
-            {/* ⭐ PASS FILTERS */}
             <button
               style={{ marginTop: 10 }}
               onClick={() =>
                 navigate(
-                  `/skills?skills=${search}&cgpa=${minCgpa}&coding=${minCoding}&aptitude=${minAptitude}`
+                  `/skills?skills=${search}&cgpa=${minCgpa}&coding=${minCoding}&aptitude=${minAptitude}&department=${department}`
                 )
               }
             >
@@ -206,8 +208,6 @@ export default function Dashboard() {
 
           </div>
         )}
-
-
 
         {/* ================================================= */}
         {/* CAMPUS SKILL DISTRIBUTION */}
@@ -235,36 +235,9 @@ export default function Dashboard() {
 
 
         {/* ================================================= */}
-        {/* OVERALL SKILL AVAILABILITY */}
-        {/* ================================================= */}
-        <h2>Overall Skill Availability (%)</h2>
-
-        <BarChart
-          width={850}
-          height={300}
-          data={skillsChart}
-          onClick={(e) => {
-            if (e && e.activeLabel) openSkill(e.activeLabel);
-          }}
-        >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="skill" />
-          <YAxis />
-          <Tooltip />
-          <Bar dataKey="percent">
-            <LabelList dataKey="percent" position="top" formatter={(v)=>`${v}%`} />
-          </Bar>
-        </BarChart>
-
-
-
-        {/* ================================================= */}
         {/* COMPANY READINESS */}
         {/* ================================================= */}
         <h2>Company Eligibility Overview</h2>
-        <p style={{ color: "gray" }}>
-          Click a company to see detailed gaps and action plan.
-        </p>
 
         <BarChart
           width={850}
@@ -280,16 +253,8 @@ export default function Dashboard() {
           <Tooltip formatter={(v) => `${v}% eligible`} />
 
           <Bar dataKey="percent">
-            <LabelList
-              dataKey="eligible"
-              position="insideTop"
-              formatter={(v) => `${v}`}
-            />
-            <LabelList
-              dataKey="percent"
-              position="top"
-              formatter={(v) => `${v}%`}
-            />
+            <LabelList dataKey="eligible" position="insideTop" />
+            <LabelList dataKey="percent" position="top" formatter={(v)=>`${v}%`} />
           </Bar>
         </BarChart>
 

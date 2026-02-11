@@ -10,6 +10,7 @@ export default function CompanyManager() {
     name: "",
     role: "",
     min_cgpa: "",
+    aptitude_cutoff: "",
     coding_cutoff: "",
     skills: ""
   };
@@ -36,6 +37,7 @@ export default function CompanyManager() {
       name: form.name,
       role: form.role,
       min_cgpa: Number(form.min_cgpa),
+      aptitude_cutoff: Number(form.aptitude_cutoff),
       coding_cutoff: Number(form.coding_cutoff),
       skills: form.skills.split(",").map(s => s.trim())
     };
@@ -67,6 +69,7 @@ export default function CompanyManager() {
       role: c.role,
       min_cgpa: c.min_cgpa,
       coding_cutoff: c.coding_cutoff,
+      aptitude_cutoff: c.aptitude_cutoff,
       skills: c.skills.join(", ")
     });
   };
@@ -121,6 +124,13 @@ export default function CompanyManager() {
           <br />
 
           <input
+            placeholder="Aptitude Cutoff"
+            value={form.aptitude_cutoff}
+            onChange={e => setForm({ ...form, aptitude_cutoff: e.target.value })}
+          />
+          <br />
+
+          <input
             placeholder="Skills (comma separated)"
             value={form.skills}
             onChange={e => setForm({ ...form, skills: e.target.value })}
@@ -159,6 +169,7 @@ export default function CompanyManager() {
               <p><b>Role:</b> {c.role || "-"}</p>
               <p><b>Min CGPA:</b> {c.min_cgpa ?? "-"}</p>
               <p><b>Coding Cutoff:</b> {c.coding_cutoff ?? "-"}</p>
+              <p><b>Aptitude Cutoff:</b> {c.aptitude_cutoff ?? "-"}</p>
               <p><b>Skills:</b> {c.skills?.length ? c.skills.join(", ") : "-"}</p>
 
               <div style={{ marginTop: 10 }}>

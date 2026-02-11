@@ -19,6 +19,7 @@ export default function StudentReport(){
       <Navbar/>
       <div style={{padding:20}}>
         <h2>{data.name}</h2>
+        <p>Roll No: {data.roll_no}</p>
         <p>Dept: {data.department}</p>
         <p>Readiness: {data.readiness}</p>
         <p>Placement Probability: {data.probability}%</p>

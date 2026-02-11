@@ -21,6 +21,7 @@ export default function SkillStudents() {
   const minCgpa = params.get("cgpa") || "";
   const coding = params.get("coding") || "";
   const aptitude = params.get("aptitude") || "";
+  const department = params.get("department") || "";
 
 
 
@@ -42,6 +43,7 @@ export default function SkillStudents() {
           if (minCgpa && s.cgpa < Number(minCgpa)) return false;
           if (coding && s.coding_score < Number(coding)) return false;
           if (aptitude && s.aptitude_score < Number(aptitude)) return false;
+          if (department && s.department !== department) return false;
 
           if (skillArray.length > 0) {
             const studentSkills = s.skills.map(x => x.toLowerCase());
@@ -89,6 +91,9 @@ export default function SkillStudents() {
             borderRadius: 8
           }}>
             <b>{s.name}</b> – {s.department}
+            <br />
+            Roll No: {s.roll_no}
+            <br />
             <br />
             CGPA: {s.cgpa}
             <br />

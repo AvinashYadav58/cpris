@@ -175,6 +175,9 @@ def analyze_company(name):
         if s["coding_score"] < c["coding_cutoff"]:
             ok = False
 
+        if s["aptitude_score"] < c.get("aptitude_cutoff", 0):
+            ok = False
+
         for skill in c["skills"]:
             if skill not in s["skills"]:
                 gaps[skill] = gaps.get(skill, 0) + 1
@@ -218,7 +221,7 @@ def dashboard_summary():
         ready = 0
 
         for s in students.find():
-            if s["cgpa"] >= c["min_cgpa"] and s["coding_score"] >= c["coding_cutoff"]:
+            if s["cgpa"] >= c["min_cgpa"] and s["coding_score"] >= c["coding_cutoff"] and s["aptitude_score"] >= c.get("aptitude_cutoff", 0):
                 if set(c["skills"]).issubset(set(s["skills"])):
                     ready += 1
 
@@ -282,14 +285,15 @@ def skill_dashboard(skill):
 def skills_dashboard():
 
     skills_param = request.args.get("skills", "")
-    min_cgpa = request.args.get("min_cgpa")
-    coding = request.args.get("coding")
-    aptitude = request.args.get("aptitude")   # ⭐ NEW
+    min_cgpa = request.args.get("min_cgpa") or 0
+    coding = request.args.get("coding") or 0
+    aptitude = request.args.get("aptitude") or 0
+    department = request.args.get("department", "").lower() or None
 
     # convert numbers safely
     min_cgpa = float(min_cgpa) if min_cgpa else None
     coding = float(coding) if coding else None
-    aptitude = float(aptitude) if aptitude else None   # ⭐ NEW
+    aptitude = float(aptitude) if aptitude else None
 
     # make skills list
     skills = [s.strip().lower() for s in skills_param.split(",") if s.strip()]
@@ -307,11 +311,14 @@ def skills_dashboard():
         if min_cgpa is not None and s.get("cgpa", 0) < min_cgpa:
             continue
 
+        if department and s.get("department", "").lower() != department:
+           continue
+
         # Coding
         if coding is not None and s.get("coding_score", 0) < coding:
             continue
 
-        # Aptitude ⭐
+        # Aptitude 
         if aptitude is not None and s.get("aptitude_score", 0) < aptitude:
             continue
 
@@ -333,16 +340,35 @@ def skills_dashboard():
     # =================================================
     companies_list = []
 
-    if skills:
-        for c in companies.find():
+    for c in companies.find():
 
+        # CGPA check
+        if min_cgpa is not None and c.get("min_cgpa", 0) > min_cgpa:
+            continue
+
+        # Coding check
+        if coding is not None and c.get("coding_cutoff", 0) > coding:
+            continue
+
+        # Aptitude check
+        if aptitude is not None and c.get("aptitude_cutoff", 0) > aptitude:
+            continue
+
+        # Skill match (optional)
+        if skills:
             company_skills = [x.lower() for x in c.get("skills", [])]
+            if not any(skill in company_skills for skill in skills):
+                continue
 
-            if any(skill in company_skills for skill in skills):
-                companies_list.append({
-                    "name": c.get("name"),
-                    "role": c.get("role")
-                })
+
+        companies_list.append({
+            "id": str(c["_id"]),
+            "name": c.get("name"),
+            "role": c.get("role"),
+            "cgpa": c.get("min_cgpa"),
+            "coding": c.get("coding_cutoff"),
+            "aptitude": c.get("aptitude_cutoff")
+        })
 
 
     return jsonify({
@@ -355,17 +381,30 @@ def skills_dashboard():
 @app.route("/dashboard/skill-distribution")
 def skill_distribution():
 
-    total = students.count_documents({})
+    department = request.args.get("department", "") or None
+
+    # base filter for students
+    student_filter = {}
+    if department:
+        student_filter["department"] = department
+
+    total = students.count_documents(student_filter)
+
     result = []
 
     for sk in db.skills.find():
         name = sk["name"]
-        count = students.count_documents({"skills": name})
+
+        # add skill condition
+        skill_filter = dict(student_filter)
+        skill_filter["skills"] = name
+
+        count = students.count_documents(skill_filter)
 
         result.append({
             "skill": name,
             "count": count,
-            "percent": round((count/total)*100,2) if total else 0
+            "percent": round((count / total) * 100, 2) if total else 0
         })
 
     return jsonify(result)
@@ -399,6 +438,10 @@ def company_readiness():
                 gaps["coding"] += 1
                 ok = False
 
+            if s["aptitude_score"] < c.get("aptitude_cutoff", 0):
+                gaps["aptitude"] = gaps.get("aptitude", 0) + 1
+                ok = False
+
             # skills
             for skill in c["skills"]:
                 if skill not in s["skills"]:
@@ -415,10 +458,63 @@ def company_readiness():
             "company": c["name"],
             "eligible": eligible,
             "percent": percent,
-            "gaps": gaps
+            "gaps": gaps,
+            "id": str(c["_id"])
         })
 
     return jsonify(result)
+
+
+@app.route("/company/<id>/eligible")
+def company_eligible(id):
+
+    department = request.args.get("department", "") or None
+
+    try:
+        company = companies.find_one({"_id": ObjectId(id)})
+        if not company:
+            return jsonify({"error": "Company not found"}), 404
+    except:
+        return jsonify({"error": "Invalid id"}), 400
+
+
+    total = students.count_documents({})
+    eligible = []
+
+    for s in students.find():
+
+        if department and s.get("department", "") != department:
+              continue
+        
+        if s.get("cgpa", 0) < company.get("min_cgpa", 0):
+            continue
+
+        if s.get("coding_score", 0) < company.get("coding_cutoff", 0):
+            continue
+
+        if s.get("aptitude_score", 0) < company.get("aptitude_cutoff", 0):
+            continue
+
+        student_skills = set([x.lower() for x in s.get("skills", [])])
+        company_skills = set([x.lower() for x in company.get("skills", [])])
+
+        if not company_skills.issubset(student_skills):
+            continue
+
+        s["_id"] = str(s["_id"])
+        eligible.append(s)
+
+
+    percent = round((len(eligible) / total) * 100, 2) if total else 0
+
+
+    return jsonify({
+        "company": company["name"],
+        "role": company.get("role"),
+        "count": len(eligible),
+        "percent": percent,
+        "students": eligible
+    })
 
 
 

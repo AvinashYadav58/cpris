@@ -26,12 +26,6 @@ def home():
 def add_student():
     data = request.json
 
-    # -------- auto register skills --------
-    # for skill in data.get("skills", []):
-    #     exists = db.skills.find_one({"name": skill})
-    #     if not exists:
-    #         db.skills.insert_one({"name": skill})
-
     students.insert_one(data)
 
     return jsonify({"msg": "student added"})
